@@ -6,9 +6,9 @@ Presentation and code snippets from my #cg17 talk about external authentication 
 <appSettings>
 ...
   <!-- AzureADOwinStartup configuration begin -->
-  <add key="tenantId" value="xxxxxxxx-xxxx-xxx-xxxx-xxxxxxxxxxxxx" />
-  <add key="clientId" value="xxxxxxxx-xxxx-xxx-xxxx-xxxxxxxxxxxxx" />
-  <add key="backOfficeUrl" value="http://localhost:xxxx/umbraco" />
+  <add key="TenantId" value="xxxxxxxx-xxxx-xxx-xxxx-xxxxxxxxxxxxx" />
+  <add key="ClientId" value="xxxxxxxx-xxxx-xxx-xxxx-xxxxxxxxxxxxx" />
+  <add key="BackOfficeUrl" value="http://localhost:xxxx/umbraco" />
   <!-- AzureADOwinStartup configuration end -->
   
   <!-- Basic AuthU configuration of an oauth endpoint for members -->
@@ -19,6 +19,8 @@ Presentation and code snippets from my #cg17 talk about external authentication 
 # Azure AD app manifest additions for adding Umbraco roles and sending group membership claims
 ```
 "groupMembershipClaims": "SecurityGroup",
+
+"appRoles": [
       {"allowedMemberTypes": [
         "User"
       ],
@@ -57,4 +59,5 @@ Presentation and code snippets from my #cg17 talk about external authentication 
       "description": "Translators will be able to access  the translation section of the backoffice only.",
       "value": "translator"
     }
+]
 ```
