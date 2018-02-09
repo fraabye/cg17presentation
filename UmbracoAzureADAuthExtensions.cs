@@ -5,6 +5,7 @@ using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using System.Web;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Owin;
 using Umbraco.Core;
 using Umbraco.Core.Security;
@@ -12,10 +13,11 @@ using Umbraco.Web.Security.Identity;
 using Microsoft.Owin.Security.OpenIdConnect;
 using Umbraco.Core.Models.Identity;
 using Umbraco.Core.Models.Membership;
+using Umbraco.Core.Persistence.Mappers;
 
-namespace ASP
+namespace Dubex.Core
 {
-    public static class UmbracoADAuthExtensions
+    public static class UmbracoAzureADAuthExtensions
     {
 
         ///  <summary>
@@ -61,9 +63,9 @@ namespace ASP
                 Authority = authority,
                 RedirectUri = postLoginRedirectUri,
                 Notifications = new OpenIdConnectAuthenticationNotifications
-                {                  
+                {
                     AuthorizationCodeReceived = async context =>
-                    {                        
+                    {
                         var userService = ApplicationContext.Current.Services.UserService;
                         var userManager = context.OwinContext.GetBackOfficeUserManager();
 
@@ -88,26 +90,28 @@ namespace ASP
 
                         var user = userService.GetByEmail(email);
 
-                        // The user was not found in Umbraco but Azure AD grants access to one or more roles.
-                        if (user == null && roles.Intersect(umbracoRoles).Any())
+                        // Abort if the user is not assigned a relevant role in Azure AD.
+                        if (!roles.Intersect(umbracoRoles).Any())
                         {
-                            var userRole = GetUmbracoRoleWithMostPrivileges(roles);                            
-                            var userType = userService.GetUserTypeByAlias(userRole);
-                            user = userService.CreateUserWithIdentity(email, email, userType);
-                            SetUmbracoSectionsForRole(user, userRole);
+                            return;
+                        }
+
+                        var userGroup = userService.GetUserGroupsByAlias(GetUmbracoRoleWithMostPrivileges(roles)).FirstOrDefault();
+
+                        if (user == null)
+                        {
+                            // The user was not found in Umbraco but Azure AD grants access to one or more roles.                                                                                 
+                            user = userService.CreateUserWithIdentity(email, email);
+                            //userService.AssignUserGroupPermission(1,);
                             userService.Save(user);
                         }
 
-                        // The user was found in Umbraco. Ensure that the current role is assigned from Azure AD and display sections accordingly.
-                        if (user != null && roles.Intersect(umbracoRoles).Any())
-                        {
-                            var userRole = GetUmbracoRoleWithMostPrivileges(roles);
-                            var userType = userService.GetUserTypeByAlias(userRole);
-                            user.UserType = userType;
-                            SetUmbracoSectionsForRole(user, userRole);
-                            userService.Save(user);
-                        }
-                        
+                        // Clear any existing groups and force apply membership from Azure AD.
+                        user.ClearGroups();
+                        user.AddGroup((IReadOnlyUserGroup)userGroup);
+
+                        userService.Save(user);
+
                         var identity = await userManager.FindByEmailAsync(email);
 
                         // If the current/newly created user is not linked to Azure AD, do it.
@@ -117,40 +121,18 @@ namespace ASP
                             identity.Name = name;
                             await userManager.UpdateAsync(identity);
                         }
-                    }         
+                    }
                 }
             };
 
             adOptions.ForUmbracoBackOffice(style, icon);
             adOptions.Caption = caption;
-            
+
             //Need to set the auth type as the issuer path
             adOptions.AuthenticationType = string.Format(CultureInfo.InvariantCulture, "https://sts.windows.net/{0}/", issuerId);
 
             //adOptions.SetExternalSignInAutoLinkOptions(new ExternalSignInAutoLinkOptions(autoLinkExternalAccount: true));
-            app.UseOpenIdConnectAuthentication(adOptions);            
-        }
-        
-        private static void SetUmbracoSectionsForRole(IUser user, string role)
-        {
-            List<string> umbracoSectionsForRole = new List<string>();
-
-            if (role.Equals("admin"))
-                umbracoSectionsForRole.AddRange(new string[] { "content", "media", "settings", "developer", "member", "users", "forms", "translation", "help" });
-
-            if (role.Equals("editor"))
-                umbracoSectionsForRole.AddRange(new string[] { "content", "media", "settings", "member", "forms", "help" });
-
-            if (role.Equals("writer"))
-                umbracoSectionsForRole.AddRange(new string[] { "content", "media", "help" });
-
-            if (role.Equals("translator"))
-                umbracoSectionsForRole.AddRange(new string[] { "content", "media", "translation", "help" });
-
-            foreach (var umbracoSection in umbracoSectionsForRole)
-            {
-                user.AddAllowedSection(umbracoSection);
-            }
+            app.UseOpenIdConnectAuthentication(adOptions);
         }
 
         private static string GetUmbracoRoleWithMostPrivileges(IEnumerable<string> roles)
@@ -170,5 +152,5 @@ namespace ASP
             throw new Exception("The list of roles does not contain any Umbraco roles.");
         }
     }
-    
+
 }
