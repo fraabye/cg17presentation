@@ -1,14 +1,14 @@
-﻿using System;
+using System;
 using System.Configuration;
-using ASP;
+using Dubex.Core;
 using Owin;
 using Umbraco.Web;
 
 public class AzureADOwinStartup : UmbracoDefaultOwinStartup
 {
-    private readonly static string clientId = ConfigurationManager.AppSettings["clientId"];    
-    private readonly static string tenantId = ConfigurationManager.AppSettings["tenantId"];    
-    private readonly static string loginUrl = ConfigurationManager.AppSettings["backOfficeUrl"];
+    private static readonly string clientId = ConfigurationManager.AppSettings["ClientId"];
+    private static readonly string tenantId = ConfigurationManager.AppSettings["TenantId"];
+    private static readonly string loginUrl = ConfigurationManager.AppSettings["BackOfficeUrl"];
 
     public override void Configuration(IAppBuilder app)
     {
